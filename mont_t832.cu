@@ -66,22 +66,53 @@ namespace device {
     
     static __device__ __constant__ /*const*/ uint32_t BLS12_377_M0 = 0xffffffff;
 
-
-
-
-     static __device__ __constant__ __align__(16) const uint32_t curve448_P[14] = { /* left-aligned value of the modulus */
-        TO_CUDA_T(0xffffffffffffffff),
+    
+ static __device__ __constant__ __align__(16) const uint32_t Curve1024_P0[32] = { /* left-aligned value of the modulus */
         TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
-        TO_CUDA_T(0xfffffffeffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xfffffffffffffffe), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
         TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
     };
 
 
-    static __device__ __constant__ /*const*/ uint32_t curve448_M0 = 0x1;
 
+    static __device__ __constant__ /*const*/ uint32_t Curve1024_M0 = 0x1;
+
+
+    static __device__ __constant__ __align__(16) const uint32_t Curve896_P0[28] = { /* left-aligned value of the modulus */
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xfffffffffffffffe),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+    };
+
+
+
+    static __device__ __constant__ /*const*/ uint32_t Curve896_M0 = 0x1;
+
+
+    static __device__ __constant__ __align__(16) const uint32_t Curve832_P0[26] = { /* left-aligned value of the modulus */
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xfffffffeffffffff), 
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+    };
+
+
+
+    static __device__ __constant__ /*const*/ uint32_t Curve832_M0 = 0x1;
 }
 
-void __global__  func1(uint32_t res[]);
 //
 // To instantiate declare modulus as __device__ __constant___ const and
 // complement it with its factual bit-length and the corresponding 32-bit
@@ -100,6 +131,7 @@ template<const size_t N, const uint32_t MOD[(N+31)/32], const uint32_t& M0,
          const uint32_t RR[(N+31)/32], const uint32_t ONE[(N+31)/32],
          const uint32_t MODx[(N+31)/32] = MOD>
 class __align__(((N+63)/64)&1 ? 8 : 16) mont_t {
+        
     public:
         static const size_t nbits = N;
         static constexpr size_t __device__ bit_length() { return N; }
@@ -589,36 +621,52 @@ typedef mont_t<753, device::MNT4753_Fr_P, device::MNT4753_Fr_M0,
                     device::MNT4753_Fr_P, device::MNT4753_Fr_P,
                     device::MNT4753_Fr_P> MNT4753_Fr;
 
-typedef mont_t<377, device::BLS12_377_P, device::BLS12_377_M0,
-                    device::BLS12_377_P, device::BLS12_377_P,
-                    device::BLS12_377_P> BLS12_377;
+typedef mont_t<1023, device::Curve1024_P0, device::Curve1024_M0,
+                    device::Curve1024_P0, device::Curve1024_P0,
+                    device::Curve1024_P0> CURVE1024_Fr;
 
-typedef mont_t<447, device::curve448_P, device::curve448_M0,
-                    device::curve448_P, device::curve448_P,
-                    device::curve448_P> CURVE448;
+typedef mont_t<895, device::Curve896_P0, device::Curve896_M0,
+                    device::Curve896_P0, device::Curve896_P0,
+                    device::Curve896_P0> CURVE896_Fr;
 
-void __global__  func1(uint32_t res[]){
+typedef mont_t<448, device::Curve832_P0, device::Curve832_M0,
+                    device::Curve832_P0, device::Curve832_P0,
+                    device::Curve832_P0> CURVE832_Fr;
+
+void __global__   func1(uint32_t res[]){
     const uint32_t* p;
     const uint32_t* p1;
-    uint32_t arr[24] =  {0xad8b430e
-,0x2165ff7e
-,0x973d9e3d
-,0xe9a7e9e4
-,0x0a63d01b
-,0x58bd8d69
-,0xb0112e04
-,0xdf846fa9
-,0x806a9439
-,0x7dc38ef1
-,0x8994cc2a
-,0x3fc9002f
-,0xd6c48328
-,0x89a3748f};
+ uint32_t arr[26] =  {0xd9cf2ec2
+    ,0xbe9b70ee
+    ,0x0d38136c
+    ,0x0d949f47
+    ,0xb2f36ab5
+    ,0x7c007702
+    ,0x87dbc017
+    ,0xc64be5e4
+    ,0x02b33c50
+    ,0x049152fc
+    ,0x733021ba
+    ,0xc84fe9e8
+    ,0x98f3cb09
+    ,0x667d0298
+    ,0x93ce1dd4
+    ,0x93d28482
+    ,0xce38f9bd
+    ,0x5533d470
+    ,0xd271dc87
+    ,0x8a0e66f9
+    ,0x3e44169f
+    ,0xe49e6705
+    ,0xf62f6d39
+    ,0x63d80199
+    ,0x7a26fd46
+    ,0x836d0069};
 
     // uint32_t arr[8] =  {0xd87cfd47,0x3c208c16,0x6871ca8d,0x97816a91,0x8181585d,0xb85045b6,0xe131a029,0x30644e72};//p,module
     // uint32_t arr[8] =  {0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111};
     p = arr;
-    CURVE448 exampleInstance(p);
+    CURVE832_Fr exampleInstance(p);
 
 
     // uint32_t arr1[8] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x1};
@@ -626,29 +674,42 @@ void __global__  func1(uint32_t res[]){
         // TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3a),
         // TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
     // uint32_t arr1[8] ={0x538afa89,0xf32cfc5b,0xd44501fb,0xb5e71911,0x0a417ff6,0x47ab1eff,0xcab8351f,0x06d89f71};//RR
-    uint32_t arr1[24] ={0x72d02669
-,0xdf094524
-,0x9b307d9b
-,0xe64dad57
-,0xd4e092a9
-,0xca8861b9
-,0x503a91b2
-,0x02be98ab
-,0xab35c477
-,0x599a00ef
-,0x138e70c4
-,0xfa73fe94
-,0x4a86af97
-,0xe217ab25};
+ uint32_t arr1[26] ={0xb01cd6e4
+    ,0xf6303896
+    ,0x08419370
+    ,0x59c168c5
+    ,0xf0fc6507
+    ,0x1546c3d7
+    ,0x146cf563
+    ,0x179f7744
+    ,0x36e247e0
+    ,0x8802746b
+    ,0x7b487201
+    ,0xb5406749
+    ,0x1f3242cd
+    ,0xdaeddd2a
+    ,0xde177ee7
+    ,0x0204070c
+    ,0x578614e7
+    ,0xf18b01b9
+    ,0xa78625b3
+    ,0x4783773e
+    ,0xe3902ca1
+    ,0xf3ab8b42
+    ,0x4212fc6b
+    ,0xdc0d0a89
+    ,0x92b9860d
+    ,0xbaa8a042};
     p1 = arr1;
-    CURVE448 exampleInstance1(p1);
+    CURVE832_Fr exampleInstance1(p1);
     exampleInstance*=exampleInstance1;
     for(int i=0;i<exampleInstance.n;i++){
         res[i]=exampleInstance[i];
     }
-    
+    // printf("\d",res[0]);
+    res[0]=exampleInstance.bit_length();
      return;
-}
+ }
 
 # undef inline
 # undef asm
@@ -658,11 +719,12 @@ void __global__  func1(uint32_t res[]){
 
 #include<iostream>
 int main(){
-    uint32_t res[24]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  uint32_t res[64]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 
     uint32_t *res_d;
-    cudaMalloc((void**)&res_d,24*sizeof(uint32_t));
-    cudaMemcpy(res_d, res,24*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&res_d,64*sizeof(uint32_t));
+    cudaMemcpy(res_d, res,64*sizeof(uint32_t), cudaMemcpyHostToDevice);
 
 
 
@@ -670,6 +732,7 @@ int GRIDEDIM = 1;
 while (true)
 {
     printf("gridDIM = %d\n",GRIDEDIM);
+
 
 int NUM_REPEATS = 10;
  float t_sum = 0;
@@ -682,7 +745,7 @@ int NUM_REPEATS = 10;
         cudaEventRecord(start);
         cudaEventQuery(start);
 
-    func1<<<GRIDEDIM,1024>>>(res_d);
+        func1<<<GRIDEDIM,1024>>>(res_d);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -706,19 +769,18 @@ int NUM_REPEATS = 10;
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 
 
-    if(GRIDEDIM==1000000000){
-        break;
-    }
 
 GRIDEDIM=GRIDEDIM*10;
-
+if(GRIDEDIM==10000000){
+    break;
+}
 }
 
 
 
     
-    cudaMemcpy(res,res_d,24*sizeof(uint32_t),cudaMemcpyDeviceToHost);
-    for(int i=0;i<24;i++){
+    cudaMemcpy(res,res_d,32*sizeof(uint32_t),cudaMemcpyDeviceToHost);
+    for(int i=0;i<32;i++){
         std::cout<<std::hex<<res[i]<<std::endl;
     }
     return 0;

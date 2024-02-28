@@ -1,0 +1,21 @@
+for i= 0 to s-1
+	C:=0
+	for j= 0 to s - 1
+		(C,S):=t[j] + a[j]b[i] + C
+		t[j] := S
+	(C,S);= t[s] +C
+	t[s] := S
+	t[s +1]:= C
+	C:=0
+	m := t[0]n''[0] mod w
+	for j= 0 to s- 1
+		(C,S) := t[j] + mn[j] +C
+		t[j]:= S
+	(C,S) := t[s] + C
+	t[s] := S
+	t[s + 1]:= t[s +1]+ C
+	for j= 0 to s
+		t[j] :=t[j+ 1]
+if t>=n
+	t-n
+return t

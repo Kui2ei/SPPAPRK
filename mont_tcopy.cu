@@ -77,427 +77,428 @@ template<const size_t N, const uint32_t MOD[(N+31)/32], const uint32_t& M0,
          const uint32_t RR[(N+31)/32], const uint32_t ONE[(N+31)/32],
          const uint32_t MODx[(N+31)/32] = MOD>
 class __align__(((N+63)/64)&1 ? 8 : 16) mont_t {
-public:
-    static const size_t nbits = N;
-    static constexpr size_t __device__ bit_length() { return N; }
-    static const uint32_t degree = 1;
-    using mem_t = mont_t;
-    static const size_t n = (N+31)/32;
-    
-public:
-    uint32_t even[n];
+        
+    public:
+        static const size_t nbits = N;
+        static constexpr size_t __device__ bit_length() { return N; }
+        static const uint32_t degree = 1;
+        using mem_t = mont_t;
+        static const size_t n = (N+31)/32;
+        
+    public:
+        uint32_t even[n];
 
-private:
-    static inline void mul_n(uint32_t* acc, const uint32_t* a, uint32_t bi,
-    size_t n_=n)
-    {
-        for (size_t j = 0; j < n_; j += 2)
-            asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
-                : "=r"(acc[j]), "=r"(acc[j+1])
-                : "r"(a[j]), "r"(bi));
-    }
-
-    static inline void cmad_n(uint32_t* acc, const uint32_t* a, uint32_t bi,
-                              size_t n_=n)
-    {
-        asm("mad.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
-            : "+r"(acc[0]), "+r"(acc[1])
-            : "r"(a[0]), "r"(bi));
-        for (size_t j = 2; j < n_; j += 2)
-            asm("madc.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
-                : "+r"(acc[j]), "+r"(acc[j+1])
-                : "r"(a[j]), "r"(bi));
-        // return carry flag
-    }
-
-    static inline void cadd_n(uint32_t* acc, const uint32_t* a, size_t n_=n)
-    {
-        asm("add.cc.u32 %0, %0, %1;" : "+r"(acc[0]) : "r"(a[0]));
-        for (size_t i = 1; i < n_; i++)
-            asm("addc.cc.u32 %0, %0, %1;" : "+r"(acc[i]) : "r"(a[i]));
-        // return carry flag
-    }
-
-    class wide_t {
     private:
-        union {
-            uint32_t even[2*n];
-            mont_t s[2];
+        static inline void mul_n(uint32_t* acc, const uint32_t* a, uint32_t bi,
+        size_t n_=n)
+        {
+            for (size_t j = 0; j < n_; j += 2)
+                asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
+                    : "=r"(acc[j]), "=r"(acc[j+1])
+                    : "r"(a[j]), "r"(bi));
+        }
+
+        static inline void cmad_n(uint32_t* acc, const uint32_t* a, uint32_t bi,
+                                size_t n_=n)
+        {
+            asm("mad.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
+                : "+r"(acc[0]), "+r"(acc[1])
+                : "r"(a[0]), "r"(bi));
+            for (size_t j = 2; j < n_; j += 2)
+                asm("madc.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
+                    : "+r"(acc[j]), "+r"(acc[j+1])
+                    : "r"(a[j]), "r"(bi));
+            // return carry flag
+        }
+
+        static inline void cadd_n(uint32_t* acc, const uint32_t* a, size_t n_=n)
+        {
+            asm("add.cc.u32 %0, %0, %1;" : "+r"(acc[0]) : "r"(a[0]));
+            for (size_t i = 1; i < n_; i++)
+                asm("addc.cc.u32 %0, %0, %1;" : "+r"(acc[i]) : "r"(a[i]));
+            // return carry flag
+        }
+
+        class wide_t {
+        private:
+            union {
+                uint32_t even[2*n];
+                mont_t s[2];
+            };
+
+        public:
+            inline uint32_t& operator[](size_t i)               { return even[i]; }
+            inline const uint32_t& operator[](size_t i) const   { return even[i]; }
+            inline operator mont_t()
+            {
+                s[0].mul_by_1();
+                return s[0] + s[1];
+            }
+            inline void final_sub(uint32_t carry, uint32_t* tmp)
+            {   s[1].final_sub(carry, tmp);   }
+
+            inline wide_t() {}
+
+        private:
+            static inline void mad_row(uint32_t* odd, uint32_t* even,
+                                    const uint32_t* a, uint32_t bi, size_t n_=n)
+            {
+                cmad_n(odd, a+1, bi, n_-2);
+                asm("madc.lo.cc.u32 %0, %2, %3, 0; madc.hi.u32 %1, %2, %3, 0;"
+                    : "=r"(odd[n_-2]), "=r"(odd[n_-1])
+                    : "r"(a[n_-1]), "r"(bi));
+
+                cmad_n(even, a, bi, n_);
+                asm("addc.u32 %0, %0, 0;" : "+r"(odd[n_-1]));
+            }
+
+        public:
+            inline wide_t(const mont_t& a, const mont_t& b)     //// |a|*|b|
+            {
+                size_t i = 0;
+                uint32_t odd[2*n-2];
+
+                mul_n(even, &a[0], b[0]);
+                mul_n(odd,  &a[1], b[0]);
+                ++i; mad_row(&even[i+1], &odd[i-1], &a[0], b[i]);
+
+                #pragma unroll
+                while (i < n-2) {
+                    ++i; mad_row(&odd[i],    &even[i],  &a[0], b[i]);
+                    ++i; mad_row(&even[i+1], &odd[i-1], &a[0], b[i]);
+                }
+
+                // merge |even| and |odd|
+                cadd_n(&even[1], &odd[0], 2*n-2);
+                asm("addc.u32 %0, %0, 0;" : "+r"(even[2*n-1]));
+            }
+        private:
+            static inline void qad_row(uint32_t* odd, uint32_t* even,
+                                    const uint32_t* a, uint32_t bi, size_t n)
+            {
+                cmad_n(odd, a, bi, n-2);
+                asm("madc.lo.cc.u32 %0, %2, %3, 0; madc.hi.u32 %1, %2, %3, 0;"
+                    : "=r"(odd[n-2]), "=r"(odd[n-1])
+                    : "r"(a[n-2]), "r"(bi));
+
+                cmad_n(even, a+1, bi, n-2);
+                asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
+            }
+        public:
+            inline wide_t(const mont_t& a)                      //// |a|**2
+            {
+                size_t i = 0, j;
+                uint32_t odd[2*n-2];
+
+                // perform |a[i]|*|a[j]| for all j>i
+                mul_n(even+2, &a[2], a[0], n-2);
+                mul_n(odd,    &a[1], a[0], n);
+
+                #pragma unroll
+                while (i < n-4) {
+                    ++i; mad_row(&even[2*i+2], &odd[2*i], &a[i+1], a[i], n-i-1);
+                    ++i; qad_row(&odd[2*i], &even[2*i+2], &a[i+1], a[i], n-i);
+                }
+
+                asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
+                    : "=r"(even[2*n-4]), "=r"(even[2*n-3])
+                    : "r"(a[n-1]), "r"(a[n-3]));
+                asm("mad.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
+                    : "+r"(odd[2*n-6]), "+r"(odd[2*n-5])
+                    : "r"(a[n-2]), "r"(a[n-3]));
+                asm("addc.u32 %0, %0, 0;" : "+r"(even[2*n-3]));
+
+                asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
+                    : "=r"(odd[2*n-4]), "=r"(odd[2*n-3])
+                    : "r"(a[n-1]), "r"(a[n-2]));
+
+                // merge |even[2:]| and |odd[1:]|
+                cadd_n(&even[2], &odd[1], 2*n-4);
+                asm("addc.u32 %0, %1, 0;" : "=r"(even[2*n-2]) : "r"(odd[2*n-3]));
+
+                // double |even|
+                even[0] = 0;
+                asm("add.cc.u32 %0, %1, %1;" : "=r"(even[1]) : "r"(odd[0]));
+                for (j = 2; j < 2*n-1; j++)
+                    asm("addc.cc.u32 %0, %0, %0;" : "+r"(even[j]));
+                asm("addc.u32 %0, 0, 0;" : "=r"(even[j]));
+
+                // accumulate "diagonal" |a[i]|*|a[i]| product
+                i = 0;
+                asm("mad.lo.cc.u32 %0, %2, %2, %0; madc.hi.cc.u32 %1, %2, %2, %1;"
+                    : "+r"(even[2*i]), "+r"(even[2*i+1])
+                    : "r"(a[i]));
+                for (++i; i < n; i++)
+                    asm("madc.lo.cc.u32 %0, %2, %2, %0; madc.hi.cc.u32 %1, %2, %2, %1;"
+                        : "+r"(even[2*i]), "+r"(even[2*i+1])
+                        : "r"(a[i]));
+            }
         };
+
+    private:
+        inline operator const uint32_t*() const             { return even;    }
+        inline operator uint32_t*()                         { return even;    }
 
     public:
         inline uint32_t& operator[](size_t i)               { return even[i]; }
         inline const uint32_t& operator[](size_t i) const   { return even[i]; }
-        inline operator mont_t()
+        inline size_t len() const                           { return n;       }
+
+        inline mont_t() {}
+        // write in 
+        inline mont_t(const uint32_t *p)
         {
-            s[0].mul_by_1();
-            return s[0] + s[1];
-        }
-        inline void final_sub(uint32_t carry, uint32_t* tmp)
-        {   s[1].final_sub(carry, tmp);   }
-
-        inline wide_t() {}
-
-    private:
-        static inline void mad_row(uint32_t* odd, uint32_t* even,
-                                   const uint32_t* a, uint32_t bi, size_t n_=n)
-        {
-            cmad_n(odd, a+1, bi, n_-2);
-            asm("madc.lo.cc.u32 %0, %2, %3, 0; madc.hi.u32 %1, %2, %3, 0;"
-                : "=r"(odd[n_-2]), "=r"(odd[n_-1])
-                : "r"(a[n_-1]), "r"(bi));
-
-            cmad_n(even, a, bi, n_);
-            asm("addc.u32 %0, %0, 0;" : "+r"(odd[n_-1]));
+            for (size_t i = 0; i < n; i++)
+                even[i] = p[i];
         }
 
-    public:
-        inline wide_t(const mont_t& a, const mont_t& b)     //// |a|*|b|
+
+    // write back
+        inline void store(uint32_t *p) const
         {
-            size_t i = 0;
-            uint32_t odd[2*n-2];
+            for (size_t i = 0; i < n; i++)
+                p[i] = even[i];
+        }
 
-            mul_n(even, &a[0], b[0]);
-            mul_n(odd,  &a[1], b[0]);
-            ++i; mad_row(&even[i+1], &odd[i-1], &a[0], b[i]);
+        inline mont_t& operator+=(const mont_t& b)
+        {
+            cadd_n(&even[0], &b[0]);
+            final_subc();
+            return *this;
+        }
+        friend inline mont_t operator+(mont_t a, const mont_t& b)
+        {   return a += b;   }
 
-            #pragma unroll
-            while (i < n-2) {
-                ++i; mad_row(&odd[i],    &even[i],  &a[0], b[i]);
-                ++i; mad_row(&even[i+1], &odd[i-1], &a[0], b[i]);
+        friend inline mont_t operator<<(mont_t a, unsigned l)
+        {   return a <<= l;   }
+
+        inline mont_t& operator>>=(unsigned r)
+        {
+            size_t i;
+            uint32_t tmp[n+1];
+
+            while (r--) {
+                tmp[n] = 0 - (even[0]&1);
+                for (i = 0; i < n; i++)
+                    tmp[i] = MOD[i] & tmp[n];
+
+                cadd_n(&tmp[0], &even[0]);
+                if (N%32 == 0)
+                    asm("addc.u32 %0, 0, 0;" : "=r"(tmp[n]));
+
+                for (i = 0; i < n-1; i++)
+                    asm("shf.r.wrap.b32 %0, %1, %2, 1;"
+                        : "=r"(even[i]) : "r"(tmp[i]), "r"(tmp[i+1]));
+                if (N%32 == 0)
+                    asm("shf.r.wrap.b32 %0, %1, %2, 1;"
+                        : "=r"(even[i]) : "r"(tmp[i]), "r"(tmp[i+1]));
+                else
+                    even[i] = tmp[i] >> 1;
             }
 
-            // merge |even| and |odd|
-            cadd_n(&even[1], &odd[0], 2*n-2);
-            asm("addc.u32 %0, %0, 0;" : "+r"(even[2*n-1]));
+            return *this;
         }
-    private:
-        static inline void qad_row(uint32_t* odd, uint32_t* even,
-                                   const uint32_t* a, uint32_t bi, size_t n)
+        friend inline mont_t operator>>(mont_t a, unsigned r)
+        {   return a >>= r;   }
+
+        inline mont_t& operator-=(const mont_t& b)
         {
-            cmad_n(odd, a, bi, n-2);
+            size_t i;
+            uint32_t tmp[n], borrow;
+
+            asm("sub.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(b[0]));
+            for (i = 1; i < n; i++)
+                asm("subc.cc.u32 %0, %0, %1;" : "+r"(even[i]) : "r"(b[i]));
+            asm("subc.u32 %0, 0, 0;" : "=r"(borrow));
+
+            asm("add.cc.u32 %0, %1, %2;" : "=r"(tmp[0]) : "r"(even[0]), "r"(MOD[0]));
+            for (i = 1; i < n-1; i++)
+                asm("addc.cc.u32 %0, %1, %2;" : "=r"(tmp[i]) : "r"(even[i]), "r"(MOD[i]));
+            asm("addc.u32 %0, %1, %2;" : "=r"(tmp[i]) : "r"(even[i]), "r"(MOD[i]));
+
+            asm("{ .reg.pred %top; setp.ne.u32 %top, %0, 0;" :: "r"(borrow));
+            for (i = 0; i < n; i++)
+                asm("@%top mov.b32 %0, %1;" : "+r"(even[i]) : "r"(tmp[i]));
+            asm("}");
+
+            return *this;
+        }
+        friend inline mont_t operator-(mont_t a, const mont_t& b)
+        {   return a -= b;   }
+
+        inline mont_t operator-() const
+        {   return cneg(*this, true);   }
+
+    private:
+        static inline void madc_n_rshift(uint32_t* odd, const uint32_t *a, uint32_t bi)
+        {
+            for (size_t j = 0; j < n-2; j += 2)
+                asm("madc.lo.cc.u32 %0, %2, %3, %4; madc.hi.cc.u32 %1, %2, %3, %5;"
+                    : "=r"(odd[j]), "=r"(odd[j+1])
+                    : "r"(a[j]), "r"(bi), "r"(odd[j+2]), "r"(odd[j+3]));
             asm("madc.lo.cc.u32 %0, %2, %3, 0; madc.hi.u32 %1, %2, %3, 0;"
                 : "=r"(odd[n-2]), "=r"(odd[n-1])
                 : "r"(a[n-2]), "r"(bi));
-
-            cmad_n(even, a+1, bi, n-2);
-            asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
         }
-    public:
-        inline wide_t(const mont_t& a)                      //// |a|**2
+
+        static inline void mad_n_redc(uint32_t *even, uint32_t* odd,
+                                    const uint32_t *a, uint32_t bi, bool first=false)
         {
-            size_t i = 0, j;
-            uint32_t odd[2*n-2];
-
-            // perform |a[i]|*|a[j]| for all j>i
-            mul_n(even+2, &a[2], a[0], n-2);
-            mul_n(odd,    &a[1], a[0], n);
-
-            #pragma unroll
-            while (i < n-4) {
-                ++i; mad_row(&even[2*i+2], &odd[2*i], &a[i+1], a[i], n-i-1);
-                ++i; qad_row(&odd[2*i], &even[2*i+2], &a[i+1], a[i], n-i);
+            if (first) {
+                mul_n(odd, a+1, bi);
+                mul_n(even, a,  bi);
+            } else {
+                asm("add.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(odd[1]));
+                madc_n_rshift(odd, a+1, bi);
+                cmad_n(even, a, bi);
+                asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
             }
 
-            asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
-                : "=r"(even[2*n-4]), "=r"(even[2*n-3])
-                : "r"(a[n-1]), "r"(a[n-3]));
-            asm("mad.lo.cc.u32 %0, %2, %3, %0; madc.hi.cc.u32 %1, %2, %3, %1;"
-                : "+r"(odd[2*n-6]), "+r"(odd[2*n-5])
-                : "r"(a[n-2]), "r"(a[n-3]));
-            asm("addc.u32 %0, %0, 0;" : "+r"(even[2*n-3]));
+            uint32_t mi = even[0] * M0;
 
-            asm("mul.lo.u32 %0, %2, %3; mul.hi.u32 %1, %2, %3;"
-                : "=r"(odd[2*n-4]), "=r"(odd[2*n-3])
-                : "r"(a[n-1]), "r"(a[n-2]));
-
-            // merge |even[2:]| and |odd[1:]|
-            cadd_n(&even[2], &odd[1], 2*n-4);
-            asm("addc.u32 %0, %1, 0;" : "=r"(even[2*n-2]) : "r"(odd[2*n-3]));
-
-            // double |even|
-            even[0] = 0;
-            asm("add.cc.u32 %0, %1, %1;" : "=r"(even[1]) : "r"(odd[0]));
-            for (j = 2; j < 2*n-1; j++)
-                asm("addc.cc.u32 %0, %0, %0;" : "+r"(even[j]));
-            asm("addc.u32 %0, 0, 0;" : "=r"(even[j]));
-
-            // accumulate "diagonal" |a[i]|*|a[i]| product
-            i = 0;
-            asm("mad.lo.cc.u32 %0, %2, %2, %0; madc.hi.cc.u32 %1, %2, %2, %1;"
-                : "+r"(even[2*i]), "+r"(even[2*i+1])
-                : "r"(a[i]));
-            for (++i; i < n; i++)
-                asm("madc.lo.cc.u32 %0, %2, %2, %0; madc.hi.cc.u32 %1, %2, %2, %1;"
-                    : "+r"(even[2*i]), "+r"(even[2*i+1])
-                    : "r"(a[i]));
-        }
-    };
-
-private:
-    inline operator const uint32_t*() const             { return even;    }
-    inline operator uint32_t*()                         { return even;    }
-
-public:
-    inline uint32_t& operator[](size_t i)               { return even[i]; }
-    inline const uint32_t& operator[](size_t i) const   { return even[i]; }
-    inline size_t len() const                           { return n;       }
-
-    inline mont_t() {}
-    // write in 
-    inline mont_t(const uint32_t *p)
-    {
-        for (size_t i = 0; i < n; i++)
-            even[i] = p[i];
-    }
-
-
-// write back
-    inline void store(uint32_t *p) const
-    {
-        for (size_t i = 0; i < n; i++)
-            p[i] = even[i];
-    }
-
-    inline mont_t& operator+=(const mont_t& b)
-    {
-        cadd_n(&even[0], &b[0]);
-        final_subc();
-        return *this;
-    }
-    friend inline mont_t operator+(mont_t a, const mont_t& b)
-    {   return a += b;   }
-
-    friend inline mont_t operator<<(mont_t a, unsigned l)
-    {   return a <<= l;   }
-
-    inline mont_t& operator>>=(unsigned r)
-    {
-        size_t i;
-        uint32_t tmp[n+1];
-
-        while (r--) {
-            tmp[n] = 0 - (even[0]&1);
-            for (i = 0; i < n; i++)
-                tmp[i] = MOD[i] & tmp[n];
-
-            cadd_n(&tmp[0], &even[0]);
-            if (N%32 == 0)
-                asm("addc.u32 %0, 0, 0;" : "=r"(tmp[n]));
-
-            for (i = 0; i < n-1; i++)
-                asm("shf.r.wrap.b32 %0, %1, %2, 1;"
-                    : "=r"(even[i]) : "r"(tmp[i]), "r"(tmp[i+1]));
-            if (N%32 == 0)
-                asm("shf.r.wrap.b32 %0, %1, %2, 1;"
-                    : "=r"(even[i]) : "r"(tmp[i]), "r"(tmp[i+1]));
-            else
-                even[i] = tmp[i] >> 1;
-        }
-
-        return *this;
-    }
-    friend inline mont_t operator>>(mont_t a, unsigned r)
-    {   return a >>= r;   }
-
-    inline mont_t& operator-=(const mont_t& b)
-    {
-        size_t i;
-        uint32_t tmp[n], borrow;
-
-        asm("sub.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(b[0]));
-        for (i = 1; i < n; i++)
-            asm("subc.cc.u32 %0, %0, %1;" : "+r"(even[i]) : "r"(b[i]));
-        asm("subc.u32 %0, 0, 0;" : "=r"(borrow));
-
-        asm("add.cc.u32 %0, %1, %2;" : "=r"(tmp[0]) : "r"(even[0]), "r"(MOD[0]));
-        for (i = 1; i < n-1; i++)
-            asm("addc.cc.u32 %0, %1, %2;" : "=r"(tmp[i]) : "r"(even[i]), "r"(MOD[i]));
-        asm("addc.u32 %0, %1, %2;" : "=r"(tmp[i]) : "r"(even[i]), "r"(MOD[i]));
-
-        asm("{ .reg.pred %top; setp.ne.u32 %top, %0, 0;" :: "r"(borrow));
-        for (i = 0; i < n; i++)
-            asm("@%top mov.b32 %0, %1;" : "+r"(even[i]) : "r"(tmp[i]));
-        asm("}");
-
-        return *this;
-    }
-    friend inline mont_t operator-(mont_t a, const mont_t& b)
-    {   return a -= b;   }
-
-    inline mont_t operator-() const
-    {   return cneg(*this, true);   }
-
-private:
-    static inline void madc_n_rshift(uint32_t* odd, const uint32_t *a, uint32_t bi)
-    {
-        for (size_t j = 0; j < n-2; j += 2)
-            asm("madc.lo.cc.u32 %0, %2, %3, %4; madc.hi.cc.u32 %1, %2, %3, %5;"
-                : "=r"(odd[j]), "=r"(odd[j+1])
-                : "r"(a[j]), "r"(bi), "r"(odd[j+2]), "r"(odd[j+3]));
-        asm("madc.lo.cc.u32 %0, %2, %3, 0; madc.hi.u32 %1, %2, %3, 0;"
-            : "=r"(odd[n-2]), "=r"(odd[n-1])
-            : "r"(a[n-2]), "r"(bi));
-    }
-
-    static inline void mad_n_redc(uint32_t *even, uint32_t* odd,
-                                  const uint32_t *a, uint32_t bi, bool first=false)
-    {
-        if (first) {
-            mul_n(odd, a+1, bi);
-            mul_n(even, a,  bi);
-        } else {
-            asm("add.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(odd[1]));
-            madc_n_rshift(odd, a+1, bi);
-            cmad_n(even, a, bi);
-            asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
-        }
-
-        uint32_t mi = even[0] * M0;
-
-        cmad_n(odd, MOD+1, mi);
-        cmad_n(even, MOD,  mi);
-        asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
-    }
-
-public:
-    friend inline mont_t operator*(const mont_t& a, const mont_t& b)
-    {
-        if (N%32 == 0) {
-            return wide_t{a, b};
-        } else {
-            mont_t even, odd;
-
-            #pragma unroll
-            for (size_t i = 0; i < n; i += 2) {
-                mad_n_redc(&even[0], &odd[0], &a[0], b[i], i==0);
-                mad_n_redc(&odd[0], &even[0], &a[0], b[i+1]);
-            }
-
-            // merge |even| and |odd|
-            cadd_n(&even[0], &odd[1], n-1);
-            asm("addc.u32 %0, %0, 0;" : "+r"(even[n-1]));
-
-            even.final_sub(0, &odd[0]);
-
-            return even;
-        }
-    }
-    inline mont_t& operator*=(const mont_t& a)
-    {   return *this = *this * a;   }
-
-    inline mont_t& sqr()
-    {   return *this = wide_t{*this};   }
-
-    inline mont_t operator()(uint32_t p)
-    {   return *this^p;   }
-
-    // raise to a constant power, e.g. x^7, to be unrolled at compile time
-    inline mont_t& operator^=(int p)
-    {
-        if (p < 2)
-            asm("trap;");
-
-        mont_t sqr = *this;
-        if ((p&1) == 0) {
-            do {
-                sqr.sqr();
-                p >>= 1;
-            } while ((p&1) == 0);
-            *this = sqr;
-        }
-        for (p >>= 1; p; p >>= 1) {
-            sqr.sqr();
-            if (p&1)
-                *this *= sqr;
-        }
-        return *this;
-    }
-    friend inline mont_t operator^(mont_t a, int p)
-    {   return p == 2 ? (mont_t)wide_t{a} : a ^= p;   }
-    inline mont_t operator()(int p)
-    {   return *this^p;   }
-    friend inline mont_t sqr(const mont_t& a)
-    {   return a^2;   }
-
-    inline void to()    { mont_t t = RR * *this; *this = t; }
-    inline void to(const uint32_t a[2*n], bool host_order = true)
-    {
-        size_t i;
-
-        // load the most significant half
-        if (host_order) {
-            for (i = 0; i < n; i++)
-                even[i] = a[n + i];
-        } else {
-            for (i = 0; i < n; i++)
-                asm("prmt.b32 %0, %1, %1, 0x0123;" : "=r"(even[i]) : "r"(a[n - 1 - i]));
-        }
-        to();
-
-        mont_t lo;
-
-        // load the least significant half
-        if (host_order) {
-            for (i = 0; i < n; i++)
-                lo[i] = a[i];
-        } else {
-            for (i = 0; i < n; i++)
-                asm("prmt.b32 %0, %1, %1, 0x0123;" : "=r"(lo[i]) : "r"(a[2*n - 1 - i]));
-        }
-
-        cadd_n(&even[0], &lo[0]);
-        final_subc();
-        to();
-    }
-    inline void from()  { mont_t t = *this; t.mul_by_1(); *this = t; }
-    inline void from(const uint32_t a[2*n], bool host_order = true)
-    {
-        size_t i;
-
-        // load the least significant half
-        if (host_order) {
-            for (i = 0; i < n; i++)
-                even[i] = a[i];
-        } else {
-            for (i = 0; i < n; i++)
-                asm("prmt.b32 %0, %1, 0, 0x0123;" : "=r"(even[i]) : "r"(a[2*n - 1 -i]));
-        }
-        mul_by_1();
-
-        mont_t hi;
-
-        // load the most significant half
-        if (host_order) {
-            for (i = 0; i < n; i++)
-                hi[i] = a[n + i];
-        } else {
-            for (i = 0; i < n; i++)
-                asm("prmt.b32 %0, %1, 0, 0x0123;" : "=r"(hi[i]) : "r"(a[n - 1 - i]));
-        }
-
-        cadd_n(&even[0], &hi[0]);
-        final_subc();
-        to();
-    }
-
-public:
-    static inline void mul_by_1_row(uint32_t* even, uint32_t* odd, bool first=false)
-    {
-        uint32_t mi;
-
-        if (first) {
-            mi = even[0] * M0;
-            mul_n(odd, MOD+1, mi);
+            cmad_n(odd, MOD+1, mi);
             cmad_n(even, MOD,  mi);
             asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
-        } else {
-            asm("add.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(odd[1]));
-# if 1      // do we trust the compiler to *not* touch the carry flag here?
-            mi = even[0] * M0;
-# else
-            asm("mul.lo.u32 %0, %1, %2;" : "=r"(mi) : "r"(even[0]), "r"(M0));
-# endif
+        }
+
+    public:
+        friend inline mont_t operator*(const mont_t& a, const mont_t& b)
+        {
+            if (N%32 == 0) {
+                return wide_t{a, b};
+            } else {
+                mont_t even, odd;
+
+                #pragma unroll
+                for (size_t i = 0; i < n; i += 2) {
+                    mad_n_redc(&even[0], &odd[0], &a[0], b[i], i==0);
+                    mad_n_redc(&odd[0], &even[0], &a[0], b[i+1]);
+                }
+
+                // merge |even| and |odd|
+                cadd_n(&even[0], &odd[1], n-1);
+                asm("addc.u32 %0, %0, 0;" : "+r"(even[n-1]));
+
+                even.final_sub(0, &odd[0]);
+
+                return even;
+            }
+        }
+        inline mont_t& operator*=(const mont_t& a)
+        {   return *this = *this * a;   }
+
+        inline mont_t& sqr()
+        {   return *this = wide_t{*this};   }
+
+        inline mont_t operator()(uint32_t p)
+        {   return *this^p;   }
+
+        // raise to a constant power, e.g. x^7, to be unrolled at compile time
+        inline mont_t& operator^=(int p)
+        {
+            if (p < 2)
+                asm("trap;");
+
+            mont_t sqr = *this;
+            if ((p&1) == 0) {
+                do {
+                    sqr.sqr();
+                    p >>= 1;
+                } while ((p&1) == 0);
+                *this = sqr;
+            }
+            for (p >>= 1; p; p >>= 1) {
+                sqr.sqr();
+                if (p&1)
+                    *this *= sqr;
+            }
+            return *this;
+        }
+        friend inline mont_t operator^(mont_t a, int p)
+        {   return p == 2 ? (mont_t)wide_t{a} : a ^= p;   }
+        inline mont_t operator()(int p)
+        {   return *this^p;   }
+        friend inline mont_t sqr(const mont_t& a)
+        {   return a^2;   }
+
+        inline void to()    { mont_t t = RR * *this; *this = t; }
+        inline void to(const uint32_t a[2*n], bool host_order = true)
+        {
+            size_t i;
+
+            // load the most significant half
+            if (host_order) {
+                for (i = 0; i < n; i++)
+                    even[i] = a[n + i];
+            } else {
+                for (i = 0; i < n; i++)
+                    asm("prmt.b32 %0, %1, %1, 0x0123;" : "=r"(even[i]) : "r"(a[n - 1 - i]));
+            }
+            to();
+
+            mont_t lo;
+
+            // load the least significant half
+            if (host_order) {
+                for (i = 0; i < n; i++)
+                    lo[i] = a[i];
+            } else {
+                for (i = 0; i < n; i++)
+                    asm("prmt.b32 %0, %1, %1, 0x0123;" : "=r"(lo[i]) : "r"(a[2*n - 1 - i]));
+            }
+
+            cadd_n(&even[0], &lo[0]);
+            final_subc();
+            to();
+        }
+        inline void from()  { mont_t t = *this; t.mul_by_1(); *this = t; }
+        inline void from(const uint32_t a[2*n], bool host_order = true)
+        {
+            size_t i;
+
+            // load the least significant half
+            if (host_order) {
+                for (i = 0; i < n; i++)
+                    even[i] = a[i];
+            } else {
+                for (i = 0; i < n; i++)
+                    asm("prmt.b32 %0, %1, 0, 0x0123;" : "=r"(even[i]) : "r"(a[2*n - 1 -i]));
+            }
+            mul_by_1();
+
+            mont_t hi;
+
+            // load the most significant half
+            if (host_order) {
+                for (i = 0; i < n; i++)
+                    hi[i] = a[n + i];
+            } else {
+                for (i = 0; i < n; i++)
+                    asm("prmt.b32 %0, %1, 0, 0x0123;" : "=r"(hi[i]) : "r"(a[n - 1 - i]));
+            }
+
+            cadd_n(&even[0], &hi[0]);
+            final_subc();
+            to();
+        }
+
+    public:
+        static inline void mul_by_1_row(uint32_t* even, uint32_t* odd, bool first=false)
+        {
+            uint32_t mi;
+
+            if (first) {
+                mi = even[0] * M0;
+                mul_n(odd, MOD+1, mi);
+                cmad_n(even, MOD,  mi);
+                asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
+            } else {
+                asm("add.cc.u32 %0, %0, %1;" : "+r"(even[0]) : "r"(odd[1]));
+    # if 1      // do we trust the compiler to *not* touch the carry flag here?
+                mi = even[0] * M0;
+    # else
+                asm("mul.lo.u32 %0, %1, %2;" : "=r"(mi) : "r"(even[0]), "r"(M0));
+    # endif
             madc_n_rshift(odd, MOD+1, mi);
             cmad_n(even, MOD, mi);
             asm("addc.u32 %0, %0, 0;" : "+r"(odd[n-1]));
@@ -566,13 +567,7 @@ typedef mont_t<753, device::MNT4753_Fr_P, device::MNT4753_Fr_M0,
                     device::MNT4753_Fr_P, device::MNT4753_Fr_P,
                     device::MNT4753_Fr_P> MNT4753_Fr;
 
-static __device__ __constant__ uint32_t p32[2] = {0x10,0x11};
-static __device__ __constant__ uint32_t M032 = 0x10;
-static __device__ __constant__ uint32_t RR32[2] = {0x10,0x11};
-static __device__ __constant__ uint32_t ONE32[2] =  {0x10,0x11};
 
-typedef mont_t<64, p32, M032,
-               RR32, ONE32> mont32;
 
 void __global__  func1(uint32_t res[]){
     const uint32_t* p;

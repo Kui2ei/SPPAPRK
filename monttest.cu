@@ -65,6 +65,14 @@ namespace device {
 
     
     static __device__ __constant__ /*const*/ uint32_t BLS12_377_M0 = 0xffffffff;
+
+    static __device__ __constant__ __align__(16) const uint32_t CURVE256_P[12] = {
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xfffffffffffffffe),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+    };
+
+    
+    static __device__ __constant__ /*const*/ uint32_t CURVE256_M = 0x00000001;
 }
 
 void __global__  func1(uint32_t res[]);
@@ -387,7 +395,7 @@ public:
             cadd_n(&even[0], &odd[1], n-1);
             asm("addc.u32 %0, %0, 0;" : "+r"(even[n-1]));
 
-            even.final_sub(0, &odd[0]);
+            even.final_sub(0, &odd[0]);//减去一个模数，如果结果比模数大的话
 
             return even;
         }
@@ -575,28 +583,30 @@ typedef mont_t<753, device::MNT4753_Fr_P, device::MNT4753_Fr_M0,
                     device::MNT4753_Fr_P, device::MNT4753_Fr_P,
                     device::MNT4753_Fr_P> MNT4753_Fr;
 
-static __device__ __constant__ uint32_t p32[2] = {0x10,0x11};
-static __device__ __constant__ uint32_t M032 = 0x10;
-static __device__ __constant__ uint32_t RR32[2] = {0x10,0x11};
-static __device__ __constant__ uint32_t ONE32[2] =  {0x10,0x11};
+typedef mont_t<377, device::BLS12_377_P, device::BLS12_377_M0,
+                    device::BLS12_377_P, device::BLS12_377_P,
+                    device::BLS12_377_P> BLS12_377;
 
-typedef mont_t<64, p32, M032,
-               RR32, ONE32> mont32;
+typedef mont_t<256, device::CURVE256_P, device::CURVE256_M,
+device::CURVE256_P, device::CURVE256_P,
+device::CURVE256_P> CURVE256;
 
 void __global__  func1(uint32_t res[]){
     const uint32_t* p;
     const uint32_t* p1;
-    uint32_t arr[24] =  {0x21fe616b,0xe28d83b8,0x12075d2f,0xa6aaf983,
-                        0x9eb4a5c2,0xd03d40b2,0x02ac50d6,0x349c5be8,
-                        0x19d34137,0xd3762e48,0x13e9d856,0x1a95ece9,
-                        0xbf52b1e2,0xab112a20,0x90280f2b,0x3dcbaf48,
-                        0x9fd0ddcd,0x67ebcbc1,0xe6d8afbe,0xff02775c,
-                        0x0c7fbfad,0x212438bb,0xe50414c0,0x0001212e};
+    uint32_t arr[8] =  {0xed91d7a3,
+        0xf2bf25bc,
+        0x9c4e4a5f,
+        0xecac3315,
+        0xb6f5675c,
+        0x05981c65,
+        0x87f70726,
+        0x1a284a11};
 
     // uint32_t arr[8] =  {0xd87cfd47,0x3c208c16,0x6871ca8d,0x97816a91,0x8181585d,0xb85045b6,0xe131a029,0x30644e72};//p,module
     // uint32_t arr[8] =  {0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111};
     p = arr;
-    MNT4753_Fr exampleInstance(p);
+    CURVE256 exampleInstance(p);
 
 
     // uint32_t arr1[8] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x1};
@@ -604,14 +614,16 @@ void __global__  func1(uint32_t res[]){
         // TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3a),
         // TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
     // uint32_t arr1[8] ={0x538afa89,0xf32cfc5b,0xd44501fb,0xb5e71911,0x0a417ff6,0x47ab1eff,0xcab8351f,0x06d89f71};//RR
-    uint32_t arr1[24] ={0x6254c212,0x09c8f174,0x6708a0de,0xb8969d83
-,0x41a42308,0x038803ed,0xaabf7656,0xb5941dbd
-,0xd0816f40,0x0a1eed78,0x167a2632,0x5bcb3a92
-,0x810789ee,0x1ff48073,0x3eccea22,0x104739d3
-,0x334da569,0xb6021307,0xc6d21596,0x486142cb
-,0xa1cac1d8,0x126fe2af,0x645ba63e,0x0001690f};
+    uint32_t arr1[8] ={0xf004743d,
+        0xa5848194,
+        0x47db70fc,
+        0x48233f1a,
+        0x479fcbe6,
+        0x55862135,
+        0x67ae92b1,
+        0x2bdb250c};
     p1 = arr1;
-    MNT4753_Fr exampleInstance1(p1);
+    CURVE256 exampleInstance1(p1);
     exampleInstance*=exampleInstance1;
     for(int i=0;i<exampleInstance.n;i++){
         res[i]=exampleInstance[i];
@@ -628,64 +640,31 @@ void __global__  func1(uint32_t res[]){
 
 #include<iostream>
 int main(){
-    uint32_t res[24]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t res[12]={0,0,0,0,0,0,0,0,0,0,0,0};
 
     uint32_t *res_d;
-    cudaMalloc((void**)&res_d,24*sizeof(uint32_t));
-    cudaMemcpy(res_d, res,24*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&res_d,12*sizeof(uint32_t));
+    cudaMemcpy(res_d, res,12*sizeof(uint32_t), cudaMemcpyHostToDevice);
 
 
-
-int GRIDEDIM = 1;
-while (true)
-{
-    printf("gridDIM = %d\n",GRIDEDIM);
-
-
-int NUM_REPEATS = 10;
- float t_sum = 0;
-    float t2_sum = 0;
-    for (int repeat = 0; repeat <= NUM_REPEATS; ++repeat)
-    {
         cudaEvent_t start, stop;
         cudaEventCreate(&start);
         cudaEventCreate(&stop);
         cudaEventRecord(start);
         cudaEventQuery(start);
 
-    func1<<<GRIDEDIM,1024>>>(res_d);
+    func1<<<2,32>>>(res_d);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
-        float elapsed_time;
-        cudaEventElapsedTime(&elapsed_time, start, stop);
-        printf("Time = %g ms.\n", elapsed_time);
-
-        if (repeat > 0)
-        {
-            t_sum += elapsed_time;
-            t2_sum += elapsed_time * elapsed_time;
-        }
 
         cudaEventDestroy(start);
         cudaEventDestroy(stop);
-    }
-
-    const float t_ave = t_sum / NUM_REPEATS;
-    const float t_err = sqrt(t2_sum / NUM_REPEATS - t_ave * t_ave);
-    
-    printf("Time = %g +- %g ms.\n", t_ave, t_err);
 
 
 
-GRIDEDIM=GRIDEDIM*10;
-}
-
-
-
-    
-    cudaMemcpy(res,res_d,24*sizeof(uint32_t),cudaMemcpyDeviceToHost);
-    for(int i=0;i<24;i++){
+    cudaMemcpy(res,res_d,12*sizeof(uint32_t),cudaMemcpyDeviceToHost);
+    for(int i=0;i<12;i++){
         std::cout<<std::hex<<res[i]<<std::endl;
     }
     return 0;

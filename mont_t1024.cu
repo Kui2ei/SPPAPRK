@@ -66,22 +66,39 @@ namespace device {
     
     static __device__ __constant__ /*const*/ uint32_t BLS12_377_M0 = 0xffffffff;
 
-
-
-
-     static __device__ __constant__ __align__(16) const uint32_t curve448_P[14] = { /* left-aligned value of the modulus */
-        TO_CUDA_T(0xffffffffffffffff),
+    
+ static __device__ __constant__ __align__(16) const uint32_t Curve1024_P0[32] = { /* left-aligned value of the modulus */
         TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
-        TO_CUDA_T(0xfffffffeffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xfffffffffffffffe), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
         TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
     };
 
 
-    static __device__ __constant__ /*const*/ uint32_t curve448_M0 = 0x1;
+
+    static __device__ __constant__ /*const*/ uint32_t Curve1024_M0 = 0x1;
+
+
+    static __device__ __constant__ __align__(16) const uint32_t Curve896_P0[28] = { /* left-aligned value of the modulus */
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xfffffffffffffffe),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+    };
+
+
+
+    static __device__ __constant__ /*const*/ uint32_t Curve896_M0 = 0x1;
 
 }
 
-void __global__  func1(uint32_t res[]);
 //
 // To instantiate declare modulus as __device__ __constant___ const and
 // complement it with its factual bit-length and the corresponding 32-bit
@@ -100,6 +117,7 @@ template<const size_t N, const uint32_t MOD[(N+31)/32], const uint32_t& M0,
          const uint32_t RR[(N+31)/32], const uint32_t ONE[(N+31)/32],
          const uint32_t MODx[(N+31)/32] = MOD>
 class __align__(((N+63)/64)&1 ? 8 : 16) mont_t {
+        
     public:
         static const size_t nbits = N;
         static constexpr size_t __device__ bit_length() { return N; }
@@ -589,36 +607,50 @@ typedef mont_t<753, device::MNT4753_Fr_P, device::MNT4753_Fr_M0,
                     device::MNT4753_Fr_P, device::MNT4753_Fr_P,
                     device::MNT4753_Fr_P> MNT4753_Fr;
 
-typedef mont_t<377, device::BLS12_377_P, device::BLS12_377_M0,
-                    device::BLS12_377_P, device::BLS12_377_P,
-                    device::BLS12_377_P> BLS12_377;
+typedef mont_t<1023, device::Curve1024_P0, device::Curve1024_M0,
+                    device::Curve1024_P0, device::Curve1024_P0,
+                    device::Curve1024_P0> CURVE1024_Fr;
 
-typedef mont_t<447, device::curve448_P, device::curve448_M0,
-                    device::curve448_P, device::curve448_P,
-                    device::curve448_P> CURVE448;
+typedef mont_t<895, device::Curve896_P0, device::Curve896_M0,
+                    device::Curve896_P0, device::Curve896_P0,
+                    device::Curve896_P0> CURVE896_Fr;
 
-void __global__  func1(uint32_t res[]){
+void __global__ __launch_bounds__(1024) func1(uint32_t res[]){
     const uint32_t* p;
     const uint32_t* p1;
-    uint32_t arr[24] =  {0xad8b430e
-,0x2165ff7e
-,0x973d9e3d
-,0xe9a7e9e4
-,0x0a63d01b
-,0x58bd8d69
-,0xb0112e04
-,0xdf846fa9
-,0x806a9439
-,0x7dc38ef1
-,0x8994cc2a
-,0x3fc9002f
-,0xd6c48328
-,0x89a3748f};
+ uint32_t arr[28] =  {0x197958e9
+    ,0x5b06dee7
+    ,0x942faea1
+    ,0xa0f76754
+    ,0x2e80f0d5
+    ,0x04748ffa
+    ,0x892bf79e
+    ,0xbb0b295c
+    ,0x556edc31
+    ,0x9921918c
+    ,0xdda073ef
+    ,0x9bda0b5f
+    ,0x3ef9763f
+    ,0x0ff103bc
+    ,0x47a18384
+    ,0x499b63de
+    ,0x0e3e8f37
+    ,0x97ff8158
+    ,0x79e55fd3
+    ,0x0848545f
+    ,0x6ec08783
+    ,0x32cb88e9
+    ,0xb5106359
+    ,0x90fffb20
+    ,0x536e6db9
+    ,0x1e5c9100
+    ,0x7bcb2c8c
+    ,0xfc13f9c8};
 
     // uint32_t arr[8] =  {0xd87cfd47,0x3c208c16,0x6871ca8d,0x97816a91,0x8181585d,0xb85045b6,0xe131a029,0x30644e72};//p,module
     // uint32_t arr[8] =  {0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111};
     p = arr;
-    CURVE448 exampleInstance(p);
+    CURVE896_Fr exampleInstance(p);
 
 
     // uint32_t arr1[8] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x1};
@@ -626,29 +658,44 @@ void __global__  func1(uint32_t res[]){
         // TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3a),
         // TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
     // uint32_t arr1[8] ={0x538afa89,0xf32cfc5b,0xd44501fb,0xb5e71911,0x0a417ff6,0x47ab1eff,0xcab8351f,0x06d89f71};//RR
-    uint32_t arr1[24] ={0x72d02669
-,0xdf094524
-,0x9b307d9b
-,0xe64dad57
-,0xd4e092a9
-,0xca8861b9
-,0x503a91b2
-,0x02be98ab
-,0xab35c477
-,0x599a00ef
-,0x138e70c4
-,0xfa73fe94
-,0x4a86af97
-,0xe217ab25};
+ uint32_t arr1[28] ={0xccf8930a
+    ,0x73700cc1
+    ,0xb4d48631
+    ,0x2c86d3de
+    ,0x564d5aca
+    ,0x25a1fa51
+    ,0x5030d598
+    ,0xca567213
+    ,0x45935ee9
+    ,0x22fbf7a8
+    ,0x991ea02d
+    ,0xf6efb34f
+    ,0x16ec4993
+    ,0x83d6900d
+    ,0x1e76566a
+    ,0xecef949e
+    ,0x164c2dd1
+    ,0xb9c23571
+    ,0x32c2e9c0
+    ,0x19f13b14
+    ,0x49dc737c
+    ,0xed52f842
+    ,0xe3f820e5
+    ,0xa0a71515
+    ,0xdc2aaf93
+    ,0x709275da
+    ,0x2fd55779
+    ,0xc1409417};
     p1 = arr1;
-    CURVE448 exampleInstance1(p1);
+    CURVE896_Fr exampleInstance1(p1);
     exampleInstance*=exampleInstance1;
     for(int i=0;i<exampleInstance.n;i++){
         res[i]=exampleInstance[i];
     }
-    
+    // printf("\d",res[0]);
+    res[0]=exampleInstance.bit_length();
      return;
-}
+ }
 
 # undef inline
 # undef asm
@@ -658,11 +705,12 @@ void __global__  func1(uint32_t res[]){
 
 #include<iostream>
 int main(){
-    uint32_t res[24]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  uint32_t res[64]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 
     uint32_t *res_d;
-    cudaMalloc((void**)&res_d,24*sizeof(uint32_t));
-    cudaMemcpy(res_d, res,24*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&res_d,64*sizeof(uint32_t));
+    cudaMemcpy(res_d, res,64*sizeof(uint32_t), cudaMemcpyHostToDevice);
 
 
 
@@ -670,6 +718,7 @@ int GRIDEDIM = 1;
 while (true)
 {
     printf("gridDIM = %d\n",GRIDEDIM);
+
 
 int NUM_REPEATS = 10;
  float t_sum = 0;
@@ -682,7 +731,7 @@ int NUM_REPEATS = 10;
         cudaEventRecord(start);
         cudaEventQuery(start);
 
-    func1<<<GRIDEDIM,1024>>>(res_d);
+        func1<<<GRIDEDIM,1024>>>(res_d);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -706,19 +755,18 @@ int NUM_REPEATS = 10;
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 
 
-    if(GRIDEDIM==1000000000){
-        break;
-    }
 
 GRIDEDIM=GRIDEDIM*10;
-
+if(GRIDEDIM==10000000){
+    break;
+}
 }
 
 
 
     
-    cudaMemcpy(res,res_d,24*sizeof(uint32_t),cudaMemcpyDeviceToHost);
-    for(int i=0;i<24;i++){
+    cudaMemcpy(res,res_d,32*sizeof(uint32_t),cudaMemcpyDeviceToHost);
+    for(int i=0;i<32;i++){
         std::cout<<std::hex<<res[i]<<std::endl;
     }
     return 0;
