@@ -23,57 +23,137 @@
 // 0x0e0a77c19a07df2f666ea36f7879462c0a78eb28f5c70b3dd35d438dc58f0d9d
 // 0x0e0a77c19a07df2f666ea36f7879462c0a78eb28f5c70b3dd35d438dc58f0d9d
 namespace device {
-#define TO_CUDA_T(limb64) (uint32_t)(limb64), (uint32_t)(limb64>>32)
-    static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_P[8] = {
-        TO_CUDA_T(0x3c208c16d87cfd47), TO_CUDA_T(0x97816a916871ca8d),
-        TO_CUDA_T(0xb85045b68181585d), TO_CUDA_T(0x30644e72e131a029)
-    };
-    static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_RR[8] = { /* (1<<512)%P */
-        TO_CUDA_T(0xf32cfc5b538afa89), TO_CUDA_T(0xb5e71911d44501fb),
-        TO_CUDA_T(0x47ab1eff0a417ff6), TO_CUDA_T(0x06d89f71cab8351f),
-    };
-    static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_one[8] = { /* (1<<256)%P */
-        TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3d),
-        TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
-    };
-    static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_Px4[8] = { /* left-aligned value of the modulus */
-        TO_CUDA_T(0xf082305b61f3f51c), TO_CUDA_T(0x5e05aa45a1c72a34),
-        TO_CUDA_T(0xe14116da06056176), TO_CUDA_T(0xc19139cb84c680a6)
-    };
-    //n`(rr_1-nn`=1) 0xd76b780d00bad4acbbc3ac183dcfc3f073dd0cc126dc4ece43b5e10de0f8076
-    static __device__ __constant__ const uint32_t ALT_BN128_M0 = 0xe4866389;
-
-
-    static __device__ __constant__ __align__(16) const uint32_t MNT4753_Fr_P[24] = { /* left-aligned value of the modulus */
-        TO_CUDA_T(0xd90776e240000001), TO_CUDA_T(0x4ea099170fa13a4f),
-        TO_CUDA_T(0xd6c381bc3f005797), TO_CUDA_T(0xb9dff97634993aa4),
-        TO_CUDA_T(0x3eebca9429212636), TO_CUDA_T(0xb26c5c28c859a99b),
-        TO_CUDA_T(0x99d124d9a15af79d), TO_CUDA_T(0x07fdb925e8a0ed8d),
-        TO_CUDA_T(0x5eb7e8f96c97d873), TO_CUDA_T(0xb7f997505b8fafed),
-        TO_CUDA_T(0x10229022eee2cdad), TO_CUDA_T(0x0001c4c62d92c411)
-    };
-
+    #define TO_CUDA_T(limb64) (uint32_t)(limb64), (uint32_t)(limb64>>32)
+        static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_P[8] = {
+            TO_CUDA_T(0x3c208c16d87cfd47), TO_CUDA_T(0x97816a916871ca8d),
+            TO_CUDA_T(0xb85045b68181585d), TO_CUDA_T(0x30644e72e131a029)
+        };
+        static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_RR[8] = { /* (1<<512)%P */
+            TO_CUDA_T(0xf32cfc5b538afa89), TO_CUDA_T(0xb5e71911d44501fb),
+            TO_CUDA_T(0x47ab1eff0a417ff6), TO_CUDA_T(0x06d89f71cab8351f),
+        };
+        static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_one[8] = { /* (1<<256)%P */
+            TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3d),
+            TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
+        };
+        static __device__ __constant__ __align__(16) const uint32_t ALT_BN128_Px4[8] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xf082305b61f3f51c), TO_CUDA_T(0x5e05aa45a1c72a34),
+            TO_CUDA_T(0xe14116da06056176), TO_CUDA_T(0xc19139cb84c680a6)
+        };
+        //n`(rr_1-nn`=1) 0xd76b780d00bad4acbbc3ac183dcfc3f073dd0cc126dc4ece43b5e10de0f8076
+        static __device__ __constant__ const uint32_t ALT_BN128_M0 = 0xe4866389;
     
-    static __device__ __constant__ const uint32_t MNT4753_Fr_M0 = 0x3fffffff;
-
-
-    static __device__ __constant__ __align__(16) const uint32_t BLS12_377_P[12] = {
-        TO_CUDA_T(0x8508c00000000001), TO_CUDA_T(0x170b5d4430000000),
-        TO_CUDA_T(0x1ef3622fba094800), TO_CUDA_T(0x1a22d9f300f5138f),
-        TO_CUDA_T(0xc63b05c06ca1493b), TO_CUDA_T(0x01ae3a4617c510ea)
-    };
-
     
-    static __device__ __constant__ /*const*/ uint32_t BLS12_377_M0 = 0xffffffff;
-
-    static __device__ __constant__ __align__(16) const uint32_t CURVE256_P[12] = {
-        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xfffffffffffffffe),
-        TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
-    };
-
+        static __device__ __constant__ __align__(16) const uint32_t MNT4753_Fr_P[24] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xd90776e240000001), TO_CUDA_T(0x4ea099170fa13a4f),
+            TO_CUDA_T(0xd6c381bc3f005797), TO_CUDA_T(0xb9dff97634993aa4),
+            TO_CUDA_T(0x3eebca9429212636), TO_CUDA_T(0xb26c5c28c859a99b),
+            TO_CUDA_T(0x99d124d9a15af79d), TO_CUDA_T(0x07fdb925e8a0ed8d),
+            TO_CUDA_T(0x5eb7e8f96c97d873), TO_CUDA_T(0xb7f997505b8fafed),
+            TO_CUDA_T(0x10229022eee2cdad), TO_CUDA_T(0x0001c4c62d92c411)
+        };
     
-    static __device__ __constant__ /*const*/ uint32_t CURVE256_M = 0x00000001;
-}
+        
+        static __device__ __constant__ const uint32_t MNT4753_Fr_M0 = 0x3fffffff;
+    
+    
+        static __device__ __constant__ __align__(16) const uint32_t BLS12_377_P[12] = {
+            TO_CUDA_T(0x8508c00000000001), TO_CUDA_T(0x170b5d4430000000),
+            TO_CUDA_T(0x1ef3622fba094800), TO_CUDA_T(0x1a22d9f300f5138f),
+            TO_CUDA_T(0xc63b05c06ca1493b), TO_CUDA_T(0x01ae3a4617c510ea)
+        };
+    
+        
+        static __device__ __constant__ /*const*/ uint32_t BLS12_377_M0 = 0xffffffff;
+    
+             static __device__ __constant__ __align__(16) const uint32_t curve448_P[14] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xfffffffeffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+        };
+    
+    
+        static __device__ __constant__ /*const*/ uint32_t curve448_M0 = 0x1;
+    
+    
+     static __device__ __constant__ __align__(16) const uint32_t Curve1024_P0[32] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xfffffffffffffffe), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+        };
+    
+    
+    
+        static __device__ __constant__ /*const*/ uint32_t Curve1024_M0 = 0x1;
+    
+     static __device__ __constant__ __align__(16) const uint32_t Curve2048_P0[64] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xfffffffffffffffe), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+        };
+    
+    
+    
+        static __device__ __constant__ /*const*/ uint32_t Curve2048_M0 = 0x1;
+    
+        static __device__ __constant__ __align__(16) const uint32_t Curve4096_P0[128] = { /* left-aligned value of the modulus */
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xfffffffffffffffe), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff),
+            TO_CUDA_T(0xffffffffffffffff), TO_CUDA_T(0xffffffffffffffff)
+        };
+    
+    
+    
+        static __device__ __constant__ /*const*/ uint32_t Curve4096_M0 = 0x1;
+    }
 
 void __global__  func1(uint32_t res[]);
 //
@@ -583,30 +663,89 @@ typedef mont_t<753, device::MNT4753_Fr_P, device::MNT4753_Fr_M0,
                     device::MNT4753_Fr_P, device::MNT4753_Fr_P,
                     device::MNT4753_Fr_P> MNT4753_Fr;
 
-typedef mont_t<377, device::BLS12_377_P, device::BLS12_377_M0,
-                    device::BLS12_377_P, device::BLS12_377_P,
-                    device::BLS12_377_P> BLS12_377;
+typedef mont_t<1024, device::Curve1024_P0, device::Curve1024_M0,
+                    device::Curve1024_P0, device::Curve1024_P0,
+                    device::Curve1024_P0> CURVE1024_Fr;
 
-typedef mont_t<256, device::CURVE256_P, device::CURVE256_M,
-device::CURVE256_P, device::CURVE256_P,
-device::CURVE256_P> CURVE256;
+typedef mont_t<2047, device::Curve2048_P0, device::Curve2048_M0,
+                    device::Curve2048_P0, device::Curve2048_P0,
+                    device::Curve2048_P0> CURVE2048_Fr;
 
-void __global__  func1(uint32_t res[]){
+typedef mont_t<4095, device::Curve4096_P0, device::Curve4096_M0,
+                    device::Curve4096_P0, device::Curve4096_P0,
+                    device::Curve4096_P0> CURVE4096_Fr;
+
+void __global__  __launch_bounds__(1024) func1(uint32_t res[]){
     const uint32_t* p;
     const uint32_t* p1;
-    uint32_t arr[8] =  {0xed91d7a3,
-        0xf2bf25bc,
-        0x9c4e4a5f,
-        0xecac3315,
-        0xb6f5675c,
-        0x05981c65,
-        0x87f70726,
-        0x1a284a11};
-
+    uint32_t arr[64] =  {0x35fd12a5
+        ,0x7b73ad92
+        ,0x6d0439dd
+        ,0x80e04f75
+        ,0xd1119e39
+        ,0x368127d7
+        ,0xd1d6c2ad
+        ,0x49cc000d
+        ,0x707d237e
+        ,0x85b8ec00
+        ,0x4c49343a
+        ,0x13c52e9c
+        ,0xc622000e
+        ,0xb7356d39
+        ,0x86eafc46
+        ,0x04b3ea56
+        ,0xa685dc27
+        ,0x154bbc12
+        ,0x5707d566
+        ,0x35f2024d
+        ,0x2e0429e3
+        ,0x7963aa51
+        ,0x55841925
+        ,0xeba1179d
+        ,0x3e59a82b
+        ,0x837fa153
+        ,0x11825765
+        ,0x60bbcc49
+        ,0xa9ea1f58
+        ,0x102de946
+        ,0x993b25f7
+        ,0x12a7f215
+        ,0x2ed9918f
+        ,0xc8e37ab3
+        ,0xba7adf30
+        ,0x3be01495
+        ,0xd1af2b39
+        ,0x16263cca
+        ,0x8e744c83
+        ,0xa2feb746
+        ,0xee9e17f0
+        ,0x333890da
+        ,0x8d15d79b
+        ,0x58930853
+        ,0x42bbf3e2
+        ,0x13e03eea
+        ,0xbdc3b799
+        ,0xdf3a9027
+        ,0xc417361c
+        ,0xf62fbc77
+        ,0xc0745d6a
+        ,0x6ab582fa
+        ,0xa99054f5
+        ,0x8688e7c9
+        ,0x56c94bdb
+        ,0xbec70edc
+        ,0x7394328d
+        ,0x2257dd5b
+        ,0x8079c1c8
+        ,0x3476bcbb
+        ,0xc78fa5a4
+        ,0x68b28d7d
+        ,0x8b483d5e
+        ,0x95f1871a};
     // uint32_t arr[8] =  {0xd87cfd47,0x3c208c16,0x6871ca8d,0x97816a91,0x8181585d,0xb85045b6,0xe131a029,0x30644e72};//p,module
     // uint32_t arr[8] =  {0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111,0x11111111};
     p = arr;
-    CURVE256 exampleInstance(p);
+    CURVE2048_Fr exampleInstance(p);
 
 
     // uint32_t arr1[8] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x1};
@@ -614,16 +753,72 @@ void __global__  func1(uint32_t res[]){
         // TO_CUDA_T(0xd35d438dc58f0d9d), TO_CUDA_T(0x0a78eb28f5c70b3a),
         // TO_CUDA_T(0x666ea36f7879462c), TO_CUDA_T(0x0e0a77c19a07df2f)
     // uint32_t arr1[8] ={0x538afa89,0xf32cfc5b,0xd44501fb,0xb5e71911,0x0a417ff6,0x47ab1eff,0xcab8351f,0x06d89f71};//RR
-    uint32_t arr1[8] ={0xf004743d,
-        0xa5848194,
-        0x47db70fc,
-        0x48233f1a,
-        0x479fcbe6,
-        0x55862135,
-        0x67ae92b1,
-        0x2bdb250c};
+    uint32_t arr1[64] ={0x2b362fc1
+        ,0x33321837
+        ,0xe06faf27
+        ,0x0f5fdcec
+        ,0xc1e9e06c
+        ,0xfbd1a618
+        ,0xb43cc74b
+        ,0x52650798
+        ,0xf43cf151
+        ,0x64873c93
+        ,0xf259967d
+        ,0x0828f32b
+        ,0x5cd077ef
+        ,0x7aaaf2e4
+        ,0x09208d10
+        ,0xc72d7295
+        ,0xef186e2d
+        ,0xf3617831
+        ,0xdec41582
+        ,0xa9fa5487
+        ,0x130ceb85
+        ,0x6ad7acb6
+        ,0x9a2b68b2
+        ,0xd2a55b9b
+        ,0x49430db1
+        ,0x75c3a00e
+        ,0x4675e441
+        ,0xa36de3aa
+        ,0xf669999f
+        ,0x4f42cbb6
+        ,0x4ddade19
+        ,0xb22a44cc
+        ,0x4d624f70
+        ,0x0a22df85
+        ,0x1a620e66
+        ,0xd16a072e
+        ,0xd1c13ee8
+        ,0xf5a58e00
+        ,0x84df9579
+        ,0xaa9558bb
+        ,0x7b608e35
+        ,0xd37008f7
+        ,0x4ec28644
+        ,0xd4e96031
+        ,0xb0c61d5a
+        ,0x0523feec
+        ,0x2e639cee
+        ,0x44232035
+        ,0x86911861
+        ,0x68a35675
+        ,0xbcbd9355
+        ,0x760945df
+        ,0x19588eb7
+        ,0xc868692e
+        ,0x9f008f02
+        ,0x6f7970fa
+        ,0xb7a4f290
+        ,0x2b738705
+        ,0xb7b05795
+        ,0x4f1cb97d
+        ,0x17f319ab
+        ,0x5cd56c07
+        ,0x9d979b9a
+        ,0xc30e164b};
     p1 = arr1;
-    CURVE256 exampleInstance1(p1);
+    CURVE2048_Fr exampleInstance1(p1);
     exampleInstance*=exampleInstance1;
     for(int i=0;i<exampleInstance.n;i++){
         res[i]=exampleInstance[i];
@@ -640,11 +835,11 @@ void __global__  func1(uint32_t res[]){
 
 #include<iostream>
 int main(){
-    uint32_t res[12]={0,0,0,0,0,0,0,0,0,0,0,0};
+    uint32_t res[64]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
     uint32_t *res_d;
-    cudaMalloc((void**)&res_d,12*sizeof(uint32_t));
-    cudaMemcpy(res_d, res,12*sizeof(uint32_t), cudaMemcpyHostToDevice);
+    cudaMalloc((void**)&res_d,64*sizeof(uint32_t));
+    cudaMemcpy(res_d, res,64*sizeof(uint32_t), cudaMemcpyHostToDevice);
 
 
         cudaEvent_t start, stop;
@@ -653,7 +848,7 @@ int main(){
         cudaEventRecord(start);
         cudaEventQuery(start);
 
-    func1<<<2,32>>>(res_d);
+    func1<<<1<<20,1024>>>(res_d);
 
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
@@ -663,8 +858,8 @@ int main(){
 
 
 
-    cudaMemcpy(res,res_d,12*sizeof(uint32_t),cudaMemcpyDeviceToHost);
-    for(int i=0;i<12;i++){
+    cudaMemcpy(res,res_d,64*sizeof(uint32_t),cudaMemcpyDeviceToHost);
+    for(int i=0;i<64;i++){
         std::cout<<std::hex<<res[i]<<std::endl;
     }
     return 0;
